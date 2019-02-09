@@ -13,7 +13,8 @@ class WindowsDoorCompression:
         # This is prototype code and doesn't validate arguments
         self._data_size = data_size
         self._tolerance = data_size / 10
-        self._multithreading_threshold = 10000
+        self._multithreading_threshold = 30000
+        self._max_iteration = 100
         
     def _run_exception(self, time_series):
         return self.__run_common_with_binary_search(time_series, self.__run_exception_internal)
@@ -23,7 +24,7 @@ class WindowsDoorCompression:
     
     def _run_hybrid(self, time_series):
         prev_exception, start, end = self.__run_common(time_series, self.__run_exception_internal)
-        compression = self.__run_common_with_binary_search(prev_exception, self.__run_compression_internal)
+        compression = self.__binary_search(prev_exception, start, end, self.__run_compression_internal)
         
         return compression
     
@@ -36,7 +37,7 @@ class WindowsDoorCompression:
                 
         prev_exception = {}
         prev_exception.update(time_series)
-        
+                
         exception_deviation = 1
         
         prev_exception_deviation = exception_deviation
@@ -45,7 +46,8 @@ class WindowsDoorCompression:
         end = maxVal - minVal
         
         if len(exception) > self._multithreading_threshold:
-            while True:                
+            iteration = 1
+            while iteration <= self._max_iteration * 10:                
                 exception = self.__run_multithread(exception, exception_deviation, run_common_method)
         
                 if len(prev_exception) >= self._data_size and len(exception) <= self._data_size:
@@ -60,7 +62,9 @@ class WindowsDoorCompression:
                 else:
                     exception_deviation /= 2
                     exception = prev_exception
-                    
+                
+                iteration += 1
+                
         return prev_exception, start, end
         
     def __run_common_with_binary_search(self, time_series, run_common_method):
@@ -77,7 +81,8 @@ class WindowsDoorCompression:
         
         next_best_time_series = time_series
                 
-        while start + 1e-5 <= end:
+        iteration = 1
+        while start + 1e-5 <= end and iteration <= self._max_iteration:
             mid = start + (end - start) / 2
             
             new_truncated_time_series = {}
@@ -94,7 +99,9 @@ class WindowsDoorCompression:
                 optimal_found = True
                 truncated_time_series = new_truncated_time_series
                 break
-        
+            
+            iteration += 1
+            
         if not optimal_found:
             truncated_time_series = next_best_time_series
         
@@ -107,19 +114,19 @@ class WindowsDoorCompression:
         results = {}
         
         time_series_slice_collections = {}
+        time_series_slice = {}
         
+        count = 0
+        for time, value in time_series.items():
+            if count % self._multithreading_threshold == 0:
+                time_series_slice = {}
+                time_series_slice_collections[count // self._multithreading_threshold] = time_series_slice
+
+            time_series_slice[time] = value
+            count += 1
+
         for i in range(thread_size):
-            time_series_slice = {}
-
-            count = 0
-            for time, value in time_series.items():
-                if count >= self._multithreading_threshold:
-                    break
-
-                time_series_slice[time] = value
-                count += 1
-
-            threads[i] = threading.Thread(target=run_internal, args=(results, time_series_slice, exception_deviation))
+            threads[i] = threading.Thread(target=run_internal, args=(results, time_series_slice_collections[i], exception_deviation))
             threads[i].start()
             threads[i].join()
                     

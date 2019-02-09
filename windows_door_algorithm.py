@@ -55,7 +55,7 @@ class WindowsDoorCompression:
                     end = max(exception_deviation, prev_exception_deviation)
                     break
 
-                if len(exception) >= self._data_size:
+                if len(exception) > self._data_size:
                     prev_exception_deviation = exception_deviation
                     exception_deviation *= 2
                     prev_exception = exception
@@ -65,6 +65,8 @@ class WindowsDoorCompression:
                 
                 iteration += 1
                 
+                print("{} {} {} {}".format(iteration, " iteration: ", len(exception), " data points remaining. "))
+
         return prev_exception, start, end
         
     def __run_common_with_binary_search(self, time_series, run_common_method):

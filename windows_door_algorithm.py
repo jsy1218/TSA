@@ -1,8 +1,5 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-from pandas.plotting import lag_plot
-import time as tm
 from datetime import timedelta
 from datetime import datetime
 import math
@@ -16,11 +13,21 @@ class WindowsDoorCompression:
         # This is prototype code and doesn't validate arguments
         self._data_size = data_size
         self._tolerance = data_size / 10
-        self._multithreading_threshold = 50000
+        self._multithreading_threshold = 10000
         
     def _run_exception(self, time_series):
-        t0 = tm.time()
-
+        return self.__run_common_with_binary_search(time_series, self.__run_exception_internal)
+    
+    def _run_compression(self, time_series):
+        return self.__run_common_with_binary_search(time_series, self.__run_compression_internal)
+    
+    def _run_hybrid(self, time_series):
+        prev_exception, start, end = self.__run_common(time_series, self.__run_exception_internal)
+        compression = self.__run_common_with_binary_search(prev_exception, self.__run_compression_internal)
+        
+        return compression
+    
+    def __run_common(self, time_series, run_common_method):
         minVal = min(list(time_series.values()))
         maxVal = max(list(time_series.values()))
         
@@ -39,7 +46,7 @@ class WindowsDoorCompression:
         
         if len(exception) > self._multithreading_threshold:
             while True:                
-                exception = self._run_exception_multithread(exception, exception_deviation)
+                exception = self.__run_multithread(exception, exception_deviation, run_common_method)
         
                 if len(prev_exception) >= self._data_size and len(exception) <= self._data_size:
                     start = 1
@@ -53,99 +60,36 @@ class WindowsDoorCompression:
                 else:
                     exception_deviation /= 2
                     exception = prev_exception
-
-        print("{} {} {} {} {} {}".format("prev_exception data size: ", len(prev_exception), " start ", start, " end ", end))
-
-        truncated_time_series =  self._binary_search(prev_exception, start, end, self._run_exception_internal)
-             
-        t1 = tm.time()
-
-        print("{} {}".format(t0, " seconds time elapsed in running exception."))
-        print("{} {}".format(t1, " seconds time elapsed in running exception."))
-
-        print("{} {}".format((t1 - t0), " seconds time elapsed in running exception."))
-        print("{} {}".format((len(time_series) - len(truncated_time_series)), "number of data points discarded as part of exception window"))
-        print("{} {}".format(len(truncated_time_series), "data points remaining"))
+                    
+        return prev_exception, start, end
         
+    def __run_common_with_binary_search(self, time_series, run_common_method):
+        prev_exception, start, end = self.__run_common(time_series, run_common_method)
+
+        truncated_time_series =  self.__binary_search(prev_exception, start, end, run_common_method)
+                     
         return truncated_time_series
     
-    def _run_compression(self, time_series):
-        t0 = tm.time()
-
-        minVal = min(list(time_series.values()))
-        maxVal = max(list(time_series.values()))
-        
-        compression = {}
-        compression.update(time_series)
-                
-        prev_compression = {}
-        prev_compression.update(time_series)
-        
-        compression_deviation = 1
-        
-        prev_compression_deviation = compression_deviation
-
-        start = 1
-        end = maxVal - minVal
-        
-        if len(compression) > self._multithreading_threshold:
-            while True:                
-                compression = self._run_multithread(compression, compression_deviation, self._run_compression_internal)
-        
-                if len(prev_compression) >= self._data_size and len(compression) <= self._data_size:
-                    start = 1
-                    end = max(compression_deviation, prev_compression_deviation)
-                    break
-
-                if len(compression) >= self._data_size:
-                    prev_compression_deviation = compression_deviation
-                    compression_deviation *= 2
-                    prev_compression = compression
-                else:
-                    compression_deviation /= 2
-                    compression = compression_deviation
-
-        print("{} {} {} {} {} {}".format("prev_compression data size: ", len(prev_compression), " start ", start, " end ", end))
-
-        truncated_time_series =  self._binary_search(prev_compression, start, end, self._run_compression_internal)
-             
-        t1 = tm.time()
-
-        print("{} {}".format(t0, " seconds time elapsed in running compression."))
-        print("{} {}".format(t1, " seconds time elapsed in running compression."))
-
-        print("{} {}".format((t1 - t0), " seconds time elapsed in running compression."))
-        print("{} {}".format((len(time_series) - len(truncated_time_series)), "number of data points discarded as part of compression window"))
-        print("{} {}".format(len(truncated_time_series), "data points remaining"))
-        
-        return truncated_time_series
-    
-    def _binary_search(self, time_series, start, end, run_internal):
+    def __binary_search(self, time_series, start, end, run_internal):
         truncated_time_series = {}
         
         optimal_found = False
         
-        next_best_time_series = {}
+        next_best_time_series = time_series
                 
         while start + 1e-5 <= end:
             mid = start + (end - start) / 2
             
             new_truncated_time_series = {}
                         
-            print("{} {} {} {} {} {}".format("before time_series data size: ", len(time_series), " start ", start, " end ", end))
-
             run_internal(new_truncated_time_series, time_series, mid)
-            
-            print("{} {} {} {} {} {}".format("after new_truncated_time_series data size: ", len(new_truncated_time_series), " start ", start, " end ", end))
-                        
+                                    
             if len(new_truncated_time_series) < self._data_size - self._tolerance:
                 end = mid
                 if abs(len(new_truncated_time_series) - (self._data_size - self._tolerance)) < abs(len(next_best_time_series) - (self._data_size - self._tolerance)):
                     next_best_time_series = new_truncated_time_series
             elif len(new_truncated_time_series) > self._data_size + self._tolerance:
                 start = mid
-                if abs(len(new_truncated_time_series) - (self._data_size + self._tolerance)) < abs(len(next_best_time_series) - (self._data_size + self._tolerance)):
-                    next_best_time_series = new_truncated_time_series
             else:
                 optimal_found = True
                 truncated_time_series = new_truncated_time_series
@@ -156,7 +100,7 @@ class WindowsDoorCompression:
         
         return truncated_time_series
         
-    def _run_multithread(self, time_series, exception_deviation, run_internal, exception_window_size = +inf):
+    def __run_multithread(self, time_series, exception_deviation, run_internal, exception_window_size = +inf):
         thread_size = (len(time_series) + self._multithreading_threshold - 1) // self._multithreading_threshold
         threads = [None] * thread_size
         
@@ -181,8 +125,7 @@ class WindowsDoorCompression:
                     
         return results
         
-    def _run_exception_internal(self, results, time_series, exception_deviation, exception_window_size = +inf):
-
+    def __run_exception_internal(self, results, time_series, exception_deviation, exception_window_size = +inf):
         exception = {}
 
         exception_window_counter = 0
@@ -228,7 +171,7 @@ class WindowsDoorCompression:
 
         results.update(exception)
         
-    def _run_compression_internal(self, results, time_series, compression_deviation, compression_window_size = +inf):
+    def __run_compression_internal(self, results, time_series, compression_deviation, compression_window_size = +inf):
         first_value_encountered = False
 
         compression = {}
@@ -252,15 +195,13 @@ class WindowsDoorCompression:
                 first_value_encountered = True
                 continue
 
-            curr_slope = (value - snapshot_value) / ((time - snapshot_time).total_seconds() / 1000.0)
+            curr_slope = (value - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
 
             curr_slope_max = (value + compression_deviation - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
             curr_slope_min = (value - compression_deviation - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
 
             slope_max = min(slope_max, curr_slope_max)
             slope_min = max(slope_min, curr_slope_min)
-
-            print("{} {} {}".format(curr_slope, slope_min, slope_max))
 
             if curr_slope < slope_min or curr_slope > slope_max:
                 compression_window_counter = 0
@@ -286,5 +227,3 @@ class WindowsDoorCompression:
             compression[last_time] = last_value
             
         results.update(compression)
-        
-        print("{}".format(len(results)))

@@ -222,10 +222,12 @@ class WindowsDoorCompression:
                 first_value_encountered = True
                 continue
 
-            curr_slope = (value - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
+            time_delta_ticks = 1000000 #we should use datetime ticks, but python perf suffer 
+                                        #((time - snapshot_time).total_seconds() * 1000)
+            curr_slope = (value - snapshot_value) / time_delta_ticks
 
-            curr_slope_max = (value + compression_deviation - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
-            curr_slope_min = (value - compression_deviation - snapshot_value) / ((time - snapshot_time).total_seconds() * 1000)
+            curr_slope_max = (value + compression_deviation - snapshot_value) / time_delta_ticks
+            curr_slope_min = (value - compression_deviation - snapshot_value) / time_delta_ticks
 
             slope_max = min(slope_max, curr_slope_max)
             slope_min = max(slope_min, curr_slope_min)
@@ -244,8 +246,10 @@ class WindowsDoorCompression:
                 snapshot_time = time
                 snapshot_value = value
 
-                slope_max = (value + compression_deviation - last_value) / ((time - last_time).total_seconds() * 1000)
-                slope_min = (value - compression_deviation - last_value) / ((time - last_time).total_seconds() * 1000)
+                last_time_delta_ticks = 1000000 #we should use datetime ticks, but python perf suffer 
+                                                #((time - last_time).total_seconds() * 1000)
+                slope_max = (value + compression_deviation - last_value) / last_time_delta_ticks
+                slope_min = (value - compression_deviation - last_value) / last_time_delta_ticks
 
             last_time = time
             last_value = value

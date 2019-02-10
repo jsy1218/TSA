@@ -4,6 +4,7 @@ from datetime import timedelta
 from datetime import datetime
 import math
 from math import inf
+from math import sqrt
 import threading
 from threading import Thread
 
@@ -29,8 +30,7 @@ class WindowsDoorCompression:
         return compression
     
     def __run_common(self, time_series, run_common_method):
-        minVal = min(list(time_series.values()))
-        maxVal = max(list(time_series.values()))
+        time_series_list = list(time_series.values())
         
         exception = {}
         exception.update(time_series)
@@ -38,8 +38,24 @@ class WindowsDoorCompression:
         prev_exception = {}
         prev_exception.update(time_series)
                 
-        exception_deviation = 1
+        index = 0
+        prev_val = 0
         
+        minVal = time_series_list[0]
+        maxVal = time_series_list[0]
+        
+        mean_sum = time_series_list[0]
+        squared_sum = time_series_list[0] * time_series_list[0]
+        
+        for index in range(1, len(time_series_list)):
+            minVal = min(minVal, time_series_list[index])
+            maxVal = max(maxVal, time_series_list[index])
+            mean_sum += time_series_list[index]
+            squared_sum += time_series_list[index] * time_series_list[index]
+        
+        mean = mean_sum / len(time_series_list)
+        exception_deviation = sqrt(squared_sum / len(time_series_list) - mean * mean) / 10
+
         prev_exception_deviation = exception_deviation
 
         start = 1

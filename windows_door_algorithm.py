@@ -55,6 +55,8 @@ class WindowsDoorCompression:
         
         mean = mean_sum / len(time_series_list)
         exception_deviation = sqrt(squared_sum / len(time_series_list) - mean * mean) / 10
+        
+        print("{} {}".format("Initial deviation:", exception_deviation))
 
         prev_exception_deviation = exception_deviation
 

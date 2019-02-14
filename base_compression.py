@@ -15,7 +15,10 @@ class BaseCompression:
         self._tolerance = tolerance
         self._multithreading_threshold = multithreading_threshold
         self._max_iteration = max_iteration
-        
+    
+    def _run(self, time_series):
+        pass
+    
     def __run_box_car_internal(self, results, time_series, box_car_deviation, box_car_window_size = +inf):
         pass
     

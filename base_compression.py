@@ -50,7 +50,7 @@ class BaseCompression:
             squared_sum += time_series_list[index] * time_series_list[index]
         
         mean = mean_sum / len(time_series_list)
-        time_series_deviation = sqrt(squared_sum / len(time_series_list) - mean * mean) / 10
+        time_series_deviation = sqrt(squared_sum / len(time_series_list) - mean * mean)
         
         print("{} {}".format("Initial deviation:", time_series_deviation))
 

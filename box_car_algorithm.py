@@ -4,7 +4,7 @@ class BoxCarCompression(BaseCompression):
     
     def __init__(self, data_size):
         # This is prototype code and doesn't validate arguments
-        super().__init__(data_size, data_size / 10, 30000, 100)
+        super().__init__(data_size, data_size / 10, 1000000, 100)
         
     def _run(self, time_series):
         return super()._run_common_with_binary_search(time_series, self._run_box_car_internal)
@@ -36,6 +36,9 @@ class BoxCarCompression(BaseCompression):
                 if time not in box_car:
                     box_car[time] = value
                 box_car_window_counter = 0
+                
+                snapshot_time = time
+                snapshot_value = value
             else:
                 box_car_window_counter = (box_car_window_counter + 1) % box_car_window_size
 

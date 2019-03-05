@@ -61,7 +61,7 @@ class BaseCompression:
         
         if len(refined_time_series) > self._multithreading_threshold:
             iteration = 1
-            while iteration <= self._max_iteration * 10:                
+            while iteration <= self._max_iteration:                
                 refined_time_series = self._run_multithread(refined_time_series, time_series_deviation, run_common_method)
         
                 if len(prev_refined_time_series) >= self._data_size and len(refined_time_series) <= self._data_size:

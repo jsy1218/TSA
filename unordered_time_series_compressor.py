@@ -75,9 +75,7 @@ class UnorderedTimeSeriesCompressor:
                      
         if len(self._chunks) is 0:
             return merged_chunks
-        
-        import pdb; pdb.set_trace()
-        
+                
         compressed_data = self.final_compressor._run(self._chunks[0])
         
         return compressed_data

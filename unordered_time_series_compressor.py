@@ -21,13 +21,12 @@ class UnorderedTimeSeriesCompressor:
             self.final_compressor = HybridCompression(data_size)
             
         self._multithreading_threshold = 10000
-        self._chunks = {}
+        self._chunks = []
         
     def _compress_chunk(self, time_series_chunk, depth = 0):               
         if len(time_series_chunk) <= self._multithreading_threshold:
             ordered_time_series_chunk = OrderedDict(sorted(time_series_chunk.items(), key=lambda t: t[0]))
-            size = len(self._chunks)
-            self._chunks[size] = self.base_compressor._run(ordered_time_series_chunk)
+            self._chunks.append(self.base_compressor._run(ordered_time_series_chunk))
         else:
             thread_size = (len(time_series_chunk) + self._multithreading_threshold - 1) // self._multithreading_threshold
             threads = [None] * thread_size
@@ -58,18 +57,28 @@ class UnorderedTimeSeriesCompressor:
                         
         index = 0
                 
-        while index in self._chunks and index + 1 in self._chunks:
-            merged_chunk = self.__merge_sorted(self._chunks[index], self._chunks[index + 1])
-            merged_chunks.update(merged_chunk)
-
-            index += 2
-
-        if index in self._chunks:        
-            merged_chunks.update(self._chunks[index])
+        while len(self._chunks) > 1:
+            chunks_copy = []
+            
+            for index in range(0, len(self._chunks), 2):
+                if index + 1 >= len(self._chunks):
+                    continue
+                
+                merged_chunk = self.__merge_sorted(self._chunks[index], self._chunks[index + 1])
+                chunks_copy.append(merged_chunk)
+                
+            if len(self._chunks) % 2 is 1:
+                chunks_copy.append(self._chunks[len(self._chunks) - 1])
+                
+            self._chunks.clear()
+            self._chunks = chunks_copy.copy()
+                     
+        if len(self._chunks) is 0:
+            return merged_chunks
         
-        self._chunks.clear()
-                                        
-        compressed_data = self.final_compressor._run(merged_chunks)
+        import pdb; pdb.set_trace()
+        
+        compressed_data = self.final_compressor._run(self._chunks[0])
         
         return compressed_data
     
